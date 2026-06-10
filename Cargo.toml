@@ -1,0 +1,12 @@
+[package]
+name = "kospi200-feed-handler"
+version = "0.1.0"
+edition = "2024"
+authors = ["Carlo Bortolan <carlobortolan@gmail.com>"]
+description = "A tiny Rust library for quantitative finance"
+license = "MIT OR Apache-2.0"
+keywords = ["pcap", "kospi200", "finance", "udp"]
+categories = ["finance", "simulation", "mathematics", "algorithms", "science"]
+repository = "https://github.com/carlobortolan/kospi200-feed-handler"
+documentation = "https://docs.rs/kospi200-feed-handler"
+homepage = "https://github.com/carlobortolan/kospi200-feed-handler"
