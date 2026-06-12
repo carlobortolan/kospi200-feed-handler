@@ -53,10 +53,10 @@ fn extract_udp_payload(packet: &[u8], link_type: u32) -> Option<&[u8]> {
         return None;
     }
 
-    Some(&packet[(udp_offset + 8)..])
+    Some(&packet[udp_offset + 8..])
 }
 
-fn extract_quote(payload: &[u8]) -> Option<u64> {
+fn extract_quote(payload: &[u8]) -> Option<&[u8]> {
     if payload.len() < QUOTE_PACKET_LENGTH {
         return None;
     }
@@ -65,9 +65,49 @@ fn extract_quote(payload: &[u8]) -> Option<u64> {
         return None;
     }
 
-    let accept_key = u64::from_be_bytes(payload[206..214].try_into().ok()?);
+    Some(&payload[..QUOTE_PACKET_LENGTH])
+}
 
-    Some(accept_key)
+fn format_output_string(ts_sec: u32, ts_usec: u32, payload: &[u8]) -> String {
+    let issue_code = std::str::from_utf8(&payload[5..17]).unwrap_or("");
+
+    let accept_time = std::str::from_utf8(&payload[206..214]).unwrap_or("");
+
+    let mut output = format!("{}.{:06} {} {}", ts_sec, ts_usec, accept_time, issue_code);
+
+    let bids = [
+        (77, 82, 82, 89),
+        (65, 70, 70, 77),
+        (53, 58, 58, 65),
+        (41, 46, 46, 53),
+        (29, 34, 34, 41),
+    ];
+
+    for &(ps, pe, qs, qe) in bids.iter() {
+        let price = std::str::from_utf8(&payload[ps..pe]).unwrap_or("");
+
+        let qty = std::str::from_utf8(&payload[qs..qe]).unwrap_or("");
+
+        output.push_str(&format!(" {}@{}", qty, price));
+    }
+
+    let asks = [
+        (96, 101, 101, 108),
+        (108, 113, 113, 120),
+        (120, 125, 125, 132),
+        (132, 137, 137, 144),
+        (144, 149, 149, 156),
+    ];
+
+    for &(ps, pe, qs, qe) in asks.iter() {
+        let price = std::str::from_utf8(&payload[ps..pe]).unwrap_or("");
+
+        let qty = std::str::from_utf8(&payload[qs..qe]).unwrap_or("");
+
+        output.push_str(&format!(" {}@{}", qty, price));
+    }
+
+    output
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -123,8 +163,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         reader.read_exact(&mut packet)?;
 
         if let Some(payload) = extract_udp_payload(&packet, ctx.link_type) {
-            if let Some(key) = extract_quote(payload) {
-                println!("quote packet accept_key={}", key);
+            if let Some(quote) = extract_quote(payload) {
+                let ts_sec = read_u32(&packet_header[0..4], ctx.swapped);
+
+                let ts_usec = read_u32(&packet_header[4..8], ctx.swapped);
+
+                println!("{}", format_output_string(ts_sec, ts_usec, quote));
             }
         }
     }
