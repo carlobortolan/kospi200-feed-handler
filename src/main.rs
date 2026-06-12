@@ -4,15 +4,11 @@ use std::env;
 use std::fs::File;
 use std::io::{BufReader, Error, ErrorKind, Read};
 
-struct PcapHeader {
-    version_major: u16,
-    version_minor: u16,
-    snaplen: u32,
-    network: u32,
-}
+const TARGET_PORTS: [u16; 2] = [15515, 15516];
 
 struct PcapContext {
     swapped: bool,
+    link_type: u32,
 }
 
 fn read_u16(data: &[u8], swapped: bool) -> u16 {
@@ -24,6 +20,57 @@ fn read_u32(data: &[u8], swapped: bool) -> u32 {
     let value = u32::from_ne_bytes([data[0], data[1], data[2], data[3]]);
 
     if swapped { value.swap_bytes() } else { value }
+}
+
+fn extract_udp_payload(packet: &[u8], link_type: u32) -> Option<&[u8]> {
+    let mut offset = match link_type {
+        1 => 14,   // Ethernet
+        113 => 16, // Linux cooked capture
+        12 => 0,   // Raw IP
+        _ => return None,
+    };
+
+    if packet.len() < offset + 20 {
+        return None;
+    }
+
+    let version = packet[offset] >> 4;
+
+    if version != 4 {
+        return None;
+    }
+
+    let ip_header_length = ((packet[offset] & 0x0f) as usize) * 4;
+
+    if packet.len() < offset + ip_header_length {
+        return None;
+    }
+
+    let protocol = packet[offset + 9];
+
+    if protocol != 17 {
+        return None;
+    }
+
+    let udp_offset = offset + ip_header_length;
+
+    if packet.len() < udp_offset + 8 {
+        return None;
+    }
+
+    let destination_port = u16::from_be_bytes([packet[udp_offset + 2], packet[udp_offset + 3]]);
+
+    if !TARGET_PORTS.contains(&destination_port) {
+        return None;
+    }
+
+    let payload_offset = udp_offset + 8;
+
+    if payload_offset >= packet.len() {
+        return None;
+    }
+
+    Some(&packet[payload_offset..])
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -38,6 +85,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut reader = BufReader::new(file);
 
     let mut global_header = [0u8; 24];
+
     reader.read_exact(&mut global_header)?;
 
     let magic = u32::from_ne_bytes([
@@ -53,24 +101,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         _ => {
             return Err(Box::new(Error::new(
                 ErrorKind::InvalidData,
-                "unsupported pcap magic",
+                "invalid pcap magic",
             )));
         }
     };
 
-    let ctx = PcapContext { swapped };
+    let link_type = read_u32(&global_header[20..24], swapped);
 
-    let header = PcapHeader {
-        version_major: read_u16(&global_header[4..6], swapped),
-        version_minor: read_u16(&global_header[6..8], swapped),
-        snaplen: read_u32(&global_header[16..20], swapped),
-        network: read_u32(&global_header[20..24], swapped),
-    };
-
-    println!(
-        "pcap version {}.{} snaplen={} network={} swapped={}",
-        header.version_major, header.version_minor, header.snaplen, header.network, ctx.swapped
-    );
+    let ctx = PcapContext { swapped, link_type };
 
     let mut packet_header = [0u8; 16];
 
@@ -81,24 +119,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             Err(e) => return Err(Box::new(e)),
         }
 
-        let timestamp_seconds = read_u32(&packet_header[0..4], ctx.swapped);
-
-        let timestamp_fraction = read_u32(&packet_header[4..8], ctx.swapped);
-
         let captured_length = read_u32(&packet_header[8..12], ctx.swapped);
 
-        let original_length = read_u32(&packet_header[12..16], ctx.swapped);
+        let mut packet = vec![0u8; captured_length as usize];
 
-        println!(
-            "packet timestamp={}.{:06} captured={} original={}",
-            timestamp_seconds, timestamp_fraction, captured_length, original_length
-        );
+        reader.read_exact(&mut packet)?;
 
-        let mut packet_data = vec![0u8; captured_length as usize];
-
-        reader.read_exact(&mut packet_data)?;
-
-        println!("read {} bytes", packet_data.len());
+        if let Some(payload) = extract_udp_payload(&packet, ctx.link_type) {
+            println!("udp payload found: {} bytes", payload.len());
+        }
     }
 
     Ok(())
