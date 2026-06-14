@@ -62,13 +62,15 @@ fn extract_udp_payload(packet: &[u8], link_type: u32) -> Option<&[u8]> {
         return None;
     }
 
-    let ip_header_length = ((packet[offset] & 0x0f) as usize) * 4;
+    let ip_len = ((packet[offset] & 0x0f) as usize) * 4;
 
-    if ip_header_length < 20 {
+    if ip_len < 20 {
         return None;
     }
 
-    if packet.len() < offset + ip_header_length {
+    let udp_offset = offset + ip_len;
+
+    if packet.len() < udp_offset + 8 {
         return None;
     }
 
@@ -76,15 +78,9 @@ fn extract_udp_payload(packet: &[u8], link_type: u32) -> Option<&[u8]> {
         return None;
     }
 
-    let udp_offset = offset + ip_header_length;
+    let port = u16::from_be_bytes([packet[udp_offset + 2], packet[udp_offset + 3]]);
 
-    if packet.len() < udp_offset + 8 {
-        return None;
-    }
-
-    let dst_port = u16::from_be_bytes([packet[udp_offset + 2], packet[udp_offset + 3]]);
-
-    if !TARGET_PORTS.contains(&dst_port) {
+    if !TARGET_PORTS.contains(&port) {
         return None;
     }
 
@@ -100,27 +96,31 @@ fn extract_quote(payload: &[u8]) -> Option<&[u8]> {
         return None;
     }
 
-    if payload.len() < 214 {
-        return None;
-    }
-
     Some(&payload[..QUOTE_PACKET_LENGTH])
 }
 
-fn format_timestamp(seconds: u32, fraction: u32, nano: bool) -> u64 {
-    let micros = if nano { fraction / 1000 } else { fraction };
+fn format_output_string(ts_sec: u32, ts_fraction: u32, payload: &[u8]) -> String {
+    let issue = std::str::from_utf8(&payload[5..17]).unwrap_or("");
 
-    seconds as u64 * 1_000_000 + micros as u64
+    let accept = std::str::from_utf8(&payload[206..214]).unwrap_or("");
+
+    let mut output = String::with_capacity(256);
+
+    output.push_str(&format!(
+        "{}.{:06} {} {}",
+        ts_sec, ts_fraction, accept, issue
+    ));
+
+    output
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();
 
-    if args.len() < 2 {
-        return Err("missing pcap file".into());
-    }
+    let file_name = args.get(1).ok_or("missing file")?;
 
-    let file = File::open(&args[1])?;
+    let file = File::open(file_name)?;
+
     let mut reader = BufReader::with_capacity(256 * 1024, file);
 
     let mut global = [0u8; 24];
@@ -135,10 +135,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         0xa1b23c4d => (false, true),
         0x4d3cb2a1 => (true, true),
         _ => {
-            return Err(Box::new(Error::new(
-                ErrorKind::InvalidData,
-                "invalid pcap magic",
-            )));
+            return Err(Box::new(Error::new(ErrorKind::InvalidData, "invalid pcap")));
         }
     };
 
@@ -150,54 +147,32 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut heap = BinaryHeap::<Reverse<QuotePacket>>::new();
 
-    let mut max_pkt_time = 0u64;
+    let mut packet_buffer = Vec::new();
 
-    let mut packet_header = [0u8; 16];
+    let mut header = [0u8; 16];
 
-    loop {
-        match reader.read_exact(&mut packet_header) {
-            Ok(_) => {}
-            Err(e) if e.kind() == ErrorKind::UnexpectedEof => break,
-            Err(e) => return Err(Box::new(e)),
-        }
-
-        let incl_len = read_u32(&packet_header[8..12], ctx.swapped) as usize;
+    while reader.read_exact(&mut header).is_ok() {
+        let incl_len = read_u32(&header[8..12], ctx.swapped) as usize;
 
         if incl_len > MAX_CAPTURE_SIZE {
-            let mut skip = vec![0u8; incl_len];
-            if reader.read_exact(&mut skip).is_err() {
-                break;
-            }
             continue;
         }
 
-        let ts_sec = read_u32(&packet_header[0..4], ctx.swapped);
+        packet_buffer.resize(incl_len, 0);
 
-        let ts_fraction = read_u32(&packet_header[4..8], ctx.swapped);
+        reader.read_exact(&mut packet_buffer)?;
 
-        let pkt_time = format_timestamp(ts_sec, ts_fraction, ctx.is_nano);
+        let packet = &packet_buffer[..incl_len];
 
-        if pkt_time > max_pkt_time {
-            max_pkt_time = pkt_time;
-        }
-
-        let mut packet = vec![0u8; incl_len];
-
-        if reader.read_exact(&mut packet).is_err() {
-            break;
-        }
-
-        if let Some(payload) = extract_udp_payload(&packet, ctx.link_type) {
+        if let Some(payload) = extract_udp_payload(packet, ctx.link_type) {
             if let Some(quote) = extract_quote(payload) {
-                if let Ok(key_bytes) = <[u8; 8]>::try_from(&quote[206..214]) {
-                    let key = u64::from_be_bytes(key_bytes);
+                let key = u64::from_be_bytes(quote[206..214].try_into().unwrap());
 
-                    heap.push(Reverse(QuotePacket {
-                        accept_key: key,
-                        pkt_time,
-                        output: format!("{}", key),
-                    }));
-                }
+                heap.push(Reverse(QuotePacket {
+                    accept_key: key,
+                    pkt_time: 0,
+                    output: format_output_string(0, 0, quote),
+                }));
             }
         }
     }
