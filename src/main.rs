@@ -11,6 +11,7 @@ const TARGET_PORTS: [u16; 2] = [15515, 15516];
 const QUOTE_PACKET_MAGIC: &[u8] = b"B6034";
 const QUOTE_PACKET_LENGTH: usize = 215;
 const MAX_DELAY_MICROSECONDS: u64 = 3_000_000;
+const MAX_CAPTURE_SIZE: usize = 16 * 1024 * 1024;
 
 #[derive(Debug, Eq, PartialEq)]
 struct QuotePacket {
@@ -61,11 +62,13 @@ fn extract_udp_payload(packet: &[u8], link_type: u32) -> Option<&[u8]> {
         return None;
     }
 
-    let ip_header_len = ((packet[offset] & 0x0f) as usize) * 4;
+    let ip_header_length = ((packet[offset] & 0x0f) as usize) * 4;
 
-    let udp_offset = offset + ip_header_len;
+    if ip_header_length < 20 {
+        return None;
+    }
 
-    if packet.len() < udp_offset + 8 {
+    if packet.len() < offset + ip_header_length {
         return None;
     }
 
@@ -73,9 +76,15 @@ fn extract_udp_payload(packet: &[u8], link_type: u32) -> Option<&[u8]> {
         return None;
     }
 
-    let port = u16::from_be_bytes([packet[udp_offset + 2], packet[udp_offset + 3]]);
+    let udp_offset = offset + ip_header_length;
 
-    if !TARGET_PORTS.contains(&port) {
+    if packet.len() < udp_offset + 8 {
+        return None;
+    }
+
+    let dst_port = u16::from_be_bytes([packet[udp_offset + 2], packet[udp_offset + 3]]);
+
+    if !TARGET_PORTS.contains(&dst_port) {
         return None;
     }
 
@@ -88,6 +97,10 @@ fn extract_quote(payload: &[u8]) -> Option<&[u8]> {
     }
 
     if &payload[..5] != QUOTE_PACKET_MAGIC {
+        return None;
+    }
+
+    if payload.len() < 214 {
         return None;
     }
 
@@ -108,7 +121,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let file = File::open(&args[1])?;
-    let mut reader = BufReader::new(file);
+    let mut reader = BufReader::with_capacity(256 * 1024, file);
 
     let mut global = [0u8; 24];
 
@@ -129,36 +142,38 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    let mut link_type = read_u32(&global[20..24], swapped);
-
-    if swapped {
-        link_type = link_type.swap_bytes();
-    }
-
     let ctx = PcapContext {
         swapped,
         is_nano,
-        link_type,
+        link_type: read_u32(&global[20..24], swapped),
     };
 
     let mut heap = BinaryHeap::<Reverse<QuotePacket>>::new();
 
     let mut max_pkt_time = 0u64;
 
-    let mut header = [0u8; 16];
+    let mut packet_header = [0u8; 16];
 
     loop {
-        match reader.read_exact(&mut header) {
+        match reader.read_exact(&mut packet_header) {
             Ok(_) => {}
             Err(e) if e.kind() == ErrorKind::UnexpectedEof => break,
             Err(e) => return Err(Box::new(e)),
         }
 
-        let ts_sec = read_u32(&header[0..4], ctx.swapped);
+        let incl_len = read_u32(&packet_header[8..12], ctx.swapped) as usize;
 
-        let ts_fraction = read_u32(&header[4..8], ctx.swapped);
+        if incl_len > MAX_CAPTURE_SIZE {
+            let mut skip = vec![0u8; incl_len];
+            if reader.read_exact(&mut skip).is_err() {
+                break;
+            }
+            continue;
+        }
 
-        let length = read_u32(&header[8..12], ctx.swapped);
+        let ts_sec = read_u32(&packet_header[0..4], ctx.swapped);
+
+        let ts_fraction = read_u32(&packet_header[4..8], ctx.swapped);
 
         let pkt_time = format_timestamp(ts_sec, ts_fraction, ctx.is_nano);
 
@@ -166,29 +181,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             max_pkt_time = pkt_time;
         }
 
-        let mut packet = vec![0u8; length as usize];
+        let mut packet = vec![0u8; incl_len];
 
-        reader.read_exact(&mut packet)?;
+        if reader.read_exact(&mut packet).is_err() {
+            break;
+        }
 
         if let Some(payload) = extract_udp_payload(&packet, ctx.link_type) {
             if let Some(quote) = extract_quote(payload) {
-                let key = u64::from_be_bytes(quote[206..214].try_into().unwrap());
+                if let Ok(key_bytes) = <[u8; 8]>::try_from(&quote[206..214]) {
+                    let key = u64::from_be_bytes(key_bytes);
 
-                let output = format!(
-                    "{}.{:06}",
-                    ts_sec,
-                    if ctx.is_nano {
-                        ts_fraction / 1000
-                    } else {
-                        ts_fraction
-                    }
-                );
-
-                heap.push(Reverse(QuotePacket {
-                    accept_key: key,
-                    pkt_time,
-                    output,
-                }));
+                    heap.push(Reverse(QuotePacket {
+                        accept_key: key,
+                        pkt_time,
+                        output: format!("{}", key),
+                    }));
+                }
             }
         }
     }
