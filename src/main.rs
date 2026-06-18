@@ -21,6 +21,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let filename = filename.ok_or("missing PCAP filename")?;
 
+    // Instead of println!() use buffered writer to lock stdout and batch writes
     let stdout = std::io::stdout();
     let mut output = BufWriter::new(stdout.lock());
 

@@ -21,8 +21,12 @@ Prints the packet and quote accept times, the issue code, followed by the bids f
 ```sh
 # 1. Compile the program:
 $ cargo build --release
-# 2. Parse a pcap file:
-$ ./parse-quote mdf-kospi200.20110216-0.pcap
+
+# 2. Run tests:
+$ cargo test
+
+# 3. Parse a pcap file:
+$ target/release/parse-quote -r data/mdf-kospi200.20110216-0.pcap
 ...
 1297814429.998584 09002997 KR4301F32505 0000134@00092 0000199@00093 0000231@00094 0000094@00095 0000308@00096 0000234@00097 0000130@00098 0000282@00099 0000415@00100 0000052@00101
 ...
