@@ -12,7 +12,7 @@
 use std::cmp::Ordering;
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
-use std::fmt::Write as _;
+use std::fmt::Write as _; // Required for the write! macro optimization
 use std::fs::File;
 use std::io::{BufReader, Error, ErrorKind, Read};
 
@@ -135,16 +135,17 @@ where
 
                 let accept_key = u64::from_be_bytes(quote[206..214].try_into().unwrap());
 
-                let mut stored_payload = [0u8; QUOTE_PACKET_LENGTH];
+                // Copy bytes safely into fixed-size array
+                let mut payload_arr = [0u8; QUOTE_PACKET_LENGTH];
 
-                stored_payload.copy_from_slice(quote);
+                payload_arr.copy_from_slice(quote);
 
                 heap.push(Reverse(QuotePacket {
                     accept_key,
                     pkt_time,
                     ts_sec,
                     ts_usec,
-                    payload: stored_payload,
+                    payload: payload_arr,
                 }));
 
                 stats.max_heap_size = stats.max_heap_size.max(heap.len());
