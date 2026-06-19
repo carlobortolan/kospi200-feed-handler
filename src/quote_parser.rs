@@ -1,5 +1,3 @@
-#![forbid(unsafe_code)]
-
 /*
  * Time Complexity:
  * O(N * log K) where N is the number of packets and K is the maximum number
@@ -12,8 +10,8 @@
 use std::cmp::Ordering;
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
-use std::fmt::Write as _; // Required for the write! macro optimization
 use std::fs::File;
+use std::io::Write as IoWrite;
 use std::io::{BufReader, Error, ErrorKind, Read};
 
 const MAX_DELAY_MICROSECONDS: u64 = 3_000_000; // 3 seconds
@@ -97,7 +95,7 @@ pub fn parse_pcap_with_stats<F>(
     mut callback: F,
 ) -> Result<ParseStats, Box<dyn std::error::Error>>
 where
-    F: FnMut(String),
+    F: FnMut(&Vec<u8>),
 {
     let file = File::open(filename)?;
 
@@ -107,7 +105,7 @@ where
 
     let mut heap = BinaryHeap::<Reverse<QuotePacket>>::new();
 
-    let mut packet_buffer = Vec::new();
+    let mut packet_buffer = vec![0u8; 65535];
 
     let mut packet_header = [0u8; 16];
 
@@ -115,10 +113,12 @@ where
 
     let mut stats = ParseStats::default();
 
+    let mut format_buf: Vec<u8> = Vec::with_capacity(256);
+
     while reader.read_exact(&mut packet_header).is_ok() {
         let incl_len = read_u32(&packet_header[8..12], context.is_swapped) as usize;
 
-        if incl_len > MAX_CAPTURE_SIZE {
+        if incl_len > MAX_CAPTURE_SIZE || incl_len > packet_buffer.len() {
             continue;
         }
 
@@ -136,17 +136,16 @@ where
 
         max_time = max_time.max(pkt_time);
 
-        packet_buffer.resize(incl_len, 0);
+        let buf_slice = &mut packet_buffer[..incl_len];
+        reader.read_exact(buf_slice)?;
 
-        reader.read_exact(&mut packet_buffer)?;
-
-        if let Some(payload) = extract_udp_payload(&packet_buffer, context.link_type) {
+        if let Some(payload) = extract_udp_payload(buf_slice, context.link_type) {
             if let Some(quote) = extract_quote(payload) {
                 stats.quotes += 1;
 
                 if !reorder {
-                    callback(format_output_string(ts_sec, ts_usec, quote));
-
+                    format_output_string(ts_sec, ts_usec, quote, &mut format_buf);
+                    callback(&format_buf);
                     continue;
                 }
 
@@ -167,18 +166,20 @@ where
 
                 stats.max_heap_size = stats.max_heap_size.max(heap.len());
 
-                flush_expired(&mut heap, max_time, &mut callback);
+                flush_expired(&mut heap, max_time, &mut format_buf, &mut callback);
             }
         }
     }
 
     if reorder {
         while let Some(Reverse(packet)) = heap.pop() {
-            callback(format_output_string(
+            format_output_string(
                 packet.ts_sec,
                 packet.ts_usec,
                 &packet.payload,
-            ));
+                &mut format_buf,
+            );
+            callback(&format_buf);
         }
     }
 
@@ -195,7 +196,7 @@ pub fn parse_pcap(
     let mut result = Vec::new();
 
     parse_pcap_with_stats(filename, reorder, |line| {
-        result.push(line);
+        result.push(String::from_utf8_lossy(line).into_owned())
     })?;
 
     Ok(result)
@@ -329,19 +330,20 @@ pub fn extract_quote(payload: &[u8]) -> Option<&[u8]> {
 /// Because network packet time (`max_time`) is assumed to be no more than 3 seconds
 /// ahead of the exchange accept time, we can output and drop any packet in the heap
 /// where `pkt_time + 3_seconds <= max_time` without risking out-of-order execution.
-fn flush_expired<F>(heap: &mut BinaryHeap<Reverse<QuotePacket>>, max_time: u64, callback: &mut F)
-where
-    F: FnMut(String),
+fn flush_expired<F>(
+    heap: &mut BinaryHeap<Reverse<QuotePacket>>,
+    max_time: u64,
+    format_buf: &mut Vec<u8>,
+    callback: &mut F,
+) where
+    F: FnMut(&Vec<u8>),
 {
     while let Some(Reverse(packet)) = heap.peek() {
         if packet.pkt_time + MAX_DELAY_MICROSECONDS <= max_time {
             let packet = heap.pop().unwrap().0;
 
-            callback(format_output_string(
-                packet.ts_sec,
-                packet.ts_usec,
-                &packet.payload,
-            ));
+            format_output_string(packet.ts_sec, packet.ts_usec, &packet.payload, format_buf);
+            callback(format_buf);
         } else {
             break;
         }
@@ -353,16 +355,18 @@ where
 ///
 /// Uses fixed byte-offsets to get the Issue Code, Accept Time and Bids and Asks.
 /// Uses `write!` macro into a pre-allocated string to minimize heap allocations.
-pub fn format_output_string(ts_sec: u32, ts_usec: u32, payload: &[u8]) -> String {
-    let issue = std::str::from_utf8(&payload[5..17]).unwrap_or("");
+pub fn format_output_string(ts_sec: u32, ts_usec: u32, payload: &[u8], out: &mut Vec<u8>) {
+    out.clear();
 
-    let accept = std::str::from_utf8(&payload[206..214]).unwrap_or("");
+    // 1. Write the Unix epoch timestamps. (Vec<u8> implements std::io::Write)
+    let _ = write!(out, "{}.{:06} ", ts_sec, ts_usec);
 
-    let mut out = String::with_capacity(256);
+    // 2. Blit the Accept Time and Issue Code raw bytes
+    out.extend_from_slice(&payload[206..214]);
+    out.push(b' ');
+    out.extend_from_slice(&payload[5..17]);
 
-    let _ = write!(out, "{}.{:06} {} {}", ts_sec, ts_usec, accept, issue);
-
-    // Bids: 5th to 1st
+    // 3. Bids: 5th to 1st
     let bid_offsets = [
         (77, 82, 82, 89), // 5th
         (65, 70, 70, 77), // 4th
@@ -371,12 +375,13 @@ pub fn format_output_string(ts_sec: u32, ts_usec: u32, payload: &[u8]) -> String
         (29, 34, 34, 41), // 1st
     ];
     for &(ps, pe, qs, qe) in &bid_offsets {
-        let qty = std::str::from_utf8(&payload[qs..qe]).unwrap_or("");
-        let price = std::str::from_utf8(&payload[ps..pe]).unwrap_or("");
-        let _ = write!(out, " {}@{}", qty, price);
+        out.push(b' ');
+        out.extend_from_slice(&payload[qs..qe]); // qty bytes
+        out.push(b'@');
+        out.extend_from_slice(&payload[ps..pe]); // price bytes
     }
 
-    // Asks: 1st to 5th
+    // 4. Asks: 1st to 5th
     let ask_offsets = [
         (96, 101, 101, 108),  // 1st
         (108, 113, 113, 120), // 2nd
@@ -385,10 +390,9 @@ pub fn format_output_string(ts_sec: u32, ts_usec: u32, payload: &[u8]) -> String
         (144, 149, 149, 156), // 5th
     ];
     for &(ps, pe, qs, qe) in &ask_offsets {
-        let qty = std::str::from_utf8(&payload[qs..qe]).unwrap_or("");
-        let price = std::str::from_utf8(&payload[ps..pe]).unwrap_or("");
-        let _ = write!(out, " {}@{}", qty, price);
+        out.push(b' ');
+        out.extend_from_slice(&payload[qs..qe]); // qty bytes
+        out.push(b'@');
+        out.extend_from_slice(&payload[ps..pe]); // price bytes
     }
-
-    out
 }

@@ -25,9 +25,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let stdout = std::io::stdout();
     let mut output = BufWriter::new(stdout.lock());
 
-    let stats = parse_pcap_with_stats(&filename, reorder, |line| {
+    let stats = parse_pcap_with_stats(&filename, reorder, |line_bytes| {
         use std::io::Write;
-        writeln!(output, "{}", line).expect("failed writing output");
+        output.write_all(line_bytes).expect("failed writing output");
+        output.write_all(b"\n").expect("failed writing newline");
     })?;
 
     eprintln!("quotes parsed: {}", stats.quotes);
