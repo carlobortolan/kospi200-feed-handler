@@ -29,7 +29,7 @@ Parses and prints quote messages from a market data feed. When invoked with an `
 
 It is designed to consume data either directly from UDP broadcast streams on ports 15515/15516 or by replaying an existing pcap file. Quote packets begin with the ASCII bytes `B6034`, and contain the five current best bids and ask liquidity on the market.
 
-This parser is optimized for low-latency environments. It currently uses zero-copy memory mapping (`memmap2`), pushing 8-byte slice pointers to the sliding-window Min-Heap and then formatting outbound strings dynamically via `itoa` without utilizing the `format!` macro or UTF-8 safety checks.
+The parser currently uses zero-copy memory mapping (`memmap2`), pushing 8-byte slice pointers to a sliding-window Min-Heap and then formatting outbound strings dynamically via `itoa`.
 
 ## Performance
 
