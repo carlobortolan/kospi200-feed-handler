@@ -35,7 +35,7 @@ pub struct ParseStats {
 /// holds a slice reference (`&'a [u8]`) pointing to the memory-mapped
 /// PCAP file, bypassing heap allocations.
 #[derive(Eq, PartialEq)]
-struct QuotePacket<'a> {
+pub struct QuotePacket<'a> {
     /// 8-byte exchange accept time (e.g., "09000123") used later for sorting.
     accept_key: u64,
 

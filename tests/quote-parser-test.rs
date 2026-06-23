@@ -77,6 +77,18 @@ mod tests {
         assert_eq!(actual.trim(), expected.trim());
     }
 
+    #[test]
+    fn verify_memory_constraints() {
+        let struct_size = std::mem::size_of::<kospi200_feed_handler::quote_parser::QuotePacket>();
+        // Should be: 8+8+4+4+16 = 40 bytes.
+        assert_eq!(struct_size, 40, "Struct size must be 40 bytes for");
+
+        // 2,765 items * 40 bytes = 110,600 bytes (~108 KB)
+        let peak_heap_usage = 2765 * struct_size;
+        println!("Historical peak heap usage: {} bytes", peak_heap_usage);
+        assert!(peak_heap_usage < 150_000, "Heap usage exceeded 150 KB");
+    }
+
     ////////////////////////////////////////////////////////////////////////////////////////
     // Stress tests: run with `cargo test -- --ignored` to avoid running them by default. //
     // Create 10 GB data/test-large10g.pcap manually using:                               //

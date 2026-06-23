@@ -39,7 +39,7 @@ The parser currently uses zero-copy memory mapping (`memmap2`), pushing 8-byte s
 - System time (seconds): **1.15 seconds**
 - Elapsed (wall clock) time: **23.61 seconds**
 - Throughput: **~465 MB/s** (Single-threaded)
-- Max application heap: ~4M packets, **<150 KB application heap** (bounded dynanically by 3-second reorder window to remain stable at $O(K)$ complexity regardless of total file size).
+- Max application heap: **<150 KB** (for historical data) **to ~20 MB** (for 5.5M+ packet stress-test bursts); Heap size is bounded dynanically by 3-second reorder window to remain stable at $O(K)$ complexity regardless of total file size.
 
 _Measured on a selfhosted VM with 32 GB RAM, AMD Ryzen 7 PRO 6850U @ 2.70GHz, and Manjaro Linux x86_64_
 
