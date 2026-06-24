@@ -1,6 +1,6 @@
 [package]
 name = "kospi200-parser"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 authors = ["Carlo Bortolan <carlobortolan@gmail.com>"]
 description = "Zero-allocation PCAP/UDP quote parser for KOSPI 200 market data feeds. "
