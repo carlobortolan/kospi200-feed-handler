@@ -29,7 +29,7 @@ Parses and prints quote messages from a historical KOSPI 200 market data feed. W
 
 It is designed to consume data either directly from UDP broadcast streams on ports 15515/15516 or by replaying an existing PCAP file. Quote packets begin with the ASCII bytes `B6034`, and contain the five current best bids and ask liquidity on the market.
 
-The parser currently uses zero-copy memory mapping (`memmap2`) to read network traffic. Incoming data is stored in a pre-allocated chunk of memory (arena) that sorts out-of-sequence packets by using a 3-second Min-Heap containing the indeces of the arena and their packet times.
+The parser currently uses zero-copy memory mapping (`memmap2`) to read network traffic. Incoming data is stored in a pre-allocated chunk of memory (arena) that sorts out-of-sequence packets by using a 3-second Min-Heap containing the indices of the arena and their packet times.
 
 ## Performance
 
@@ -39,7 +39,7 @@ The parser currently uses zero-copy memory mapping (`memmap2`) to read network t
 - System time (seconds): **0.82 seconds**
 - Elapsed (wall clock) time: **21.54 seconds**
 - Throughput: **~510 MB/s** , **1.97M PPS**(Single-threaded)
-- Max application heap: **<150 KB** (for historical data) **to ~20 MB** (for 5.5M+ packet stress-test bursts); Heap size is bounded dynanically by 3-second reorder window to remain stable at O(K) regardless of total file/input size.
+- Max application heap: **<150 KB** (for historical data) **to ~20 MB** (for 5.5M+ packet stress-test bursts); Heap size is bounded dynamically by 3-second reorder window to remain stable at O(K) regardless of total file/input size.
 
 _Measured on a selfhosted VM with 32 GB RAM, AMD Ryzen 7 PRO 6850U @ 2.70GHz, and Manjaro Linux x86_64_
 
