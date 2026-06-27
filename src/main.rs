@@ -1,7 +1,8 @@
+use std::env;
+use std::io::{BufWriter, stdout};
+
 use kospi200_parser::kospi::KospiHandler;
 use kospi200_parser::sources::{run_pcap_source, run_udp_source};
-use std::env;
-use std::io::BufWriter;
 
 enum DataSource {
     Pcap(String),
@@ -34,10 +35,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let source = source.expect("Must specify either --pcap or --udp");
 
-    let stdout = std::io::stdout();
+    let stdout = stdout();
     let mut output = BufWriter::new(stdout.lock());
 
-    // Instantiate our stateful KOSPI parser
+    // Instantiate stateful KOSPI parser
     let mut kospi_handler = KospiHandler::new(reorder);
 
     match source {

@@ -142,6 +142,7 @@ impl KospiHandler {
             return;
         }
 
+        // Quote accept time as key for heap
         let accept_key = u64::from_be_bytes(payload[206..214].try_into().unwrap());
 
         // --- SLAB ALLOCATOR: Request memory slot ---
@@ -232,8 +233,21 @@ impl KospiHandler {
     ) {
         format_buf.clear();
 
-        // 1. Write the Unix epoch timestamps. (Vec<u8> implements std::io::Write)
-        let _ = write!(format_buf, "{}.{:06} ", ts_sec, ts_usec);
+        // 1. Write the Unix epoch timestamps using itoa
+        let mut num_buf = itoa::Buffer::new();
+
+        // Write seconds
+        format_buf.extend_from_slice(num_buf.format(ts_sec).as_bytes());
+        format_buf.push(b'.');
+
+        // Write microseconds with branchless zero-padding
+        let usec_bytes = num_buf.format(ts_usec).as_bytes();
+        let pad_len = 6usize.saturating_sub(usec_bytes.len());
+
+        format_buf.extend_from_slice(&b"000000"[..pad_len]); // Pad
+        format_buf.extend_from_slice(usec_bytes); // Digits
+        format_buf.push(b' '); // Space delimiter
+                
         // 2. Blit the Accept Time and Issue Code raw bytes
         format_buf.extend_from_slice(&payload[206..214]);
         format_buf.push(b' ');
