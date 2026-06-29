@@ -42,8 +42,8 @@ The heap is sorted by exchange time (quote accept time), but the sliding window 
 - User time (seconds): 8.16 seconds
 - System time (seconds): 0.46 seconds
 - Elapsed (wall clock) time: 8.68 seconds
-- Throughput: **~1.2 GB/s**, **4.4M PPS / ~227 ns per packet** (Single-threaded)
-- Max application heap: **~256 MB initial pre-allocation** (see [calculation](benches/README.md#The-Math-Behind-the-~256-MB))
+- Throughput: **~1.2 GB/s**, **4.4M PPS / ~227 ns per packet** (single-threaded)
+- Max application heap: **~256 MB initial pre-allocation** (see [calculation](benches/README.md#the-math-behind-the-256-mb))
 
 #### Micro-Benchmark (isolated execution measured with criterion)
 
@@ -51,11 +51,9 @@ A packet is processed in **~209 ns per packet**; roughly 4.8 million PPS sequent
 
 ![on_packet Micro-Benchmark](benches/kospi_on_packet.png)
 
-<!-- ![on_packet Micro-Benchmark](benches/kospi_run_pcap_source.png) -->
-
 #### CPU Profiling
 
-The flamegraph confirms that once the fixed-size arena and heap are initialized, the parser spends its CPU cycles entirely on structural heap sifting (`sift_down_to_bottom`) and raw byte formatting (`copy_nonoverlapping`) and not on memory allocator at runtime.
+The flamegraph confirms that once the fixed-size arena and heap are initialized, the parser spends most of its CPU cycles entirely on structural heap sifting (`sift_down_to_bottom`) and raw byte formatting (`copy_nonoverlapping`) and not on memory allocation at runtime.
 
 ![CPU Flamegraph](benches/flamegraph.svg)
 
@@ -83,7 +81,6 @@ target/release/parse-quote -r --pcap data/mdf-kospi200.20110216-0.pcap
 
 # Alternatively, listen to live UDP market data feed
 target/release/parse-quote -r --udp 239.0.0.1:15515
-
 ```
 
 The handler assumes that the difference between the quote accept time and the PCAP packet time is never more than 3 seconds.
