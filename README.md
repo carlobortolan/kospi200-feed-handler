@@ -51,6 +51,8 @@ A packet is processed in **~209 ns per packet**; roughly 4.8 million PPS sequent
 
 ![on_packet Micro-Benchmark](benches/kospi_on_packet.png)
 
+See [kospi200.pages.dev](https://kospi200.pages.dev/on_packet/report) for full report.
+
 #### CPU Profiling
 
 The flamegraph confirms that once the fixed-size arena and heap are initialized, the parser spends most of its CPU cycles entirely on structural heap sifting (`sift_down_to_bottom`) and raw byte formatting (`copy_nonoverlapping`) and not on memory allocation at runtime.
