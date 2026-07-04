@@ -89,7 +89,7 @@ The handler assumes that the difference between the quote accept time and the PC
 
 ## Minimum supported Rust version (MSRV)
 
-This crate requires a Rust version of 1.85.0 or higher. Increases in MSRV will be considered a semver non-breaking API change and require a version increase (PATCH until 1.0.0, MINOR after 1.0.0).
+This crate requires a Rust version of 1.86.0 or higher. Increases in MSRV will be considered a semver non-breaking API change and require a version increase (PATCH until 1.0.0, MINOR after 1.0.0).
 
 ## License
 

@@ -14,7 +14,7 @@ homepage = "https://github.com/carlobortolan/kospi200-parser"
 include = ["LICENSE-MIT.md", "LICENSE-APACHE.md", "src/", "tests/"]
 
 # When changing MSRV: Also update the README
-rust-version = "1.85.0"
+rust-version = "1.86.0"
 
 [[bin]]
 name = "parse-quote"
