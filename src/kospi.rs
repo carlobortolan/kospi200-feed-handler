@@ -286,6 +286,6 @@ impl KospiHandler {
         }
 
         format_buf.push(b'\n');
-        out.write_all(&format_buf).unwrap();
+        out.write_all(format_buf).unwrap();
     }
 }

@@ -1,30 +1,23 @@
 # KOSPI 200 Parser
 
-<!-- ![tests][actions-test-badge] -->
-
+![tests][actions-test-badge]
 [![MIT/Apache 2.0 licensed][license-badge]]()
 [![Crate][crates-badge]][crates-url]
 [![docs.rs][docsrs-badge]][docs-url]
 ![Crates.io MSRV][crates-msrv-badge]
-
-<!--[![codecov-kospi200-parser][codecov-badge]][codecov-url]-->
+[![codecov-kospi200-parser][codecov-badge]][codecov-url]
 <!--![Crates.io downloads][crates-download-badge] -->
 
-<!--[actions-test-badge]: https://github.com/carlobortolan/kospi200-parser/actions/workflows/ci.yml/badge.svg -->
-
+[actions-test-badge]: https://github.com/carlobortolan/kospi200-parser/actions/workflows/ci.yml/badge.svg
 [license-badge]: https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg
 [crates-badge]: https://img.shields.io/crates/v/kospi200-parser.svg
 [crates-url]: https://crates.io/crates/kospi200-parser
 [docsrs-badge]: https://img.shields.io/docsrs/kospi200-parser
 [docs-url]: https://docs.rs/kospi200-parser
-
-<!--[codecov-badge]: https://codecov.io/gh/carlobortolan/kospi200-parser/graph/badge.svg?token=NJ4HW3OQFY
-[codecov-url]: https://codecov.io/gh/carlobortolan/kospi200-parser -->
-
+[codecov-badge]: https://codecov.io/gh/carlobortolan/kospi200-parser/graph/badge.svg?token=NJ4HW3OQFY
+[codecov-url]: https://codecov.io/gh/carlobortolan/kospi200-parser
 [crates-msrv-badge]: https://img.shields.io/crates/msrv/kospi200-parser
-
 <!--[crates-download-badge]: https://img.shields.io/crates/d/kospi200-parser -->
-
 [license-badge]: https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg
 
 Parses and prints quote messages from a historical KOSPI 200 market data feed. When invoked with an `-r` flag, the program re-orders the messages according to the quote accept time at the exchange.

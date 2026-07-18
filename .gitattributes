@@ -1,0 +1,3 @@
+# Ensure golden testing files always use LF
+*.unsorted text eol=lf
+*.sorted text eol=lf
