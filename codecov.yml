@@ -13,4 +13,4 @@ coverage:
         base: auto
         enabled: yes
 ignore:
-  - "src/bin/**/*"
+  - "src/bin/generate_10g.rs"
