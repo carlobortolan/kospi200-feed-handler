@@ -84,6 +84,7 @@ where
 {
     let socket = UdpSocket::bind(addr)?;
 
+    // If multicast IP (e.g., 239.0.0.1), join the group
     let ip: std::net::IpAddr = addr.split(':').next().unwrap().parse()?;
     if ip.is_multicast() {
         if let std::net::IpAddr::V4(ipv4) = ip {
@@ -91,11 +92,12 @@ where
         }
     }
 
-    let mut buf = [0u8; 65536];
+    let mut buf = [0u8; 65536]; // Max UDP packet size (64 KB)
 
     loop {
         let (len, _src) = socket.recv_from(&mut buf)?;
 
+        // UDP Packet arrival time
         let now: std::time::Duration = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?;
         let ts_sec = now.as_secs() as u32;
         let ts_usec = now.subsec_micros();
