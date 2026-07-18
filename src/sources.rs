@@ -80,7 +80,7 @@ where
 /// layer headers, this function directly yields the application payload to the callback.
 pub fn run_udp_source<F>(addr: &str, mut callback: F) -> Result<(), Box<dyn std::error::Error>>
 where
-    F: FnMut(u32, u32, &[u8]),
+    F: FnMut(u32, u32, &[u8]) -> bool,
 {
     let socket = UdpSocket::bind(addr)?;
 
@@ -102,8 +102,12 @@ where
         let ts_sec = now.as_secs() as u32;
         let ts_usec = now.subsec_micros();
 
-        callback(ts_sec, ts_usec, &buf[..len]);
+        if !callback(ts_sec, ts_usec, &buf[..len]) {
+            break;
+        }
     }
+
+    Ok(())
 }
 
 /// Parses the 24-byte PCAP global header.

@@ -52,6 +52,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             eprintln!("Listening on UDP feed: {}", addr);
             run_udp_source(&addr, |sec, usec, payload| {
                 kospi_handler.on_packet(sec, usec, payload, &mut output);
+                true
             })?;
         }
     }

@@ -12,3 +12,5 @@ coverage:
         threshold: 10%
         base: auto
         enabled: yes
+ignore:
+  - "src/bin/**/*"

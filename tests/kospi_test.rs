@@ -120,9 +120,8 @@ mod tests {
 
     ////////////////////////////////////////////////////////////////////////////////////////
     // Stress tests: run with `cargo test -- --ignored` to avoid running them by default. //
-    // Create 10 GB data/test-large10g.pcap manually using:                               //
-    // mergecap -F pcap -w data/large10g.pcap \                                           //
-    // $(yes data/mdf-kospi200.20110216-0.pcap | head -200)                               //
+    // Create 10 GB data/test-large10g.pcap manually first:                               //
+    // $ cargo run --release --bin generate_10g                                           //
     ////////////////////////////////////////////////////////////////////////////////////////
 
     #[test]
