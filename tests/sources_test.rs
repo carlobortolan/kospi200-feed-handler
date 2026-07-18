@@ -44,3 +44,10 @@ fn test_udp_multicast_join_branch() {
 
     let _ = run_udp_source(addr, |_, _, _| false);
 }
+
+#[test]
+fn test_udp_timeout() {
+    let addr = "127.0.0.1:15518";
+    let result = run_udp_source(addr, |_, _, _| false);
+    assert!(result.is_ok(), "UDP source should have exited cleanly");
+}
