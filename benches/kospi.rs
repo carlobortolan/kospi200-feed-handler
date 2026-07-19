@@ -1,5 +1,4 @@
 use std::hint::black_box;
-use std::io::sink;
 
 use criterion::{Criterion, criterion_group, criterion_main};
 use kospi200_parser::{KospiHandler, run_pcap_source};
@@ -10,19 +9,17 @@ fn kospi_benchmark(c: &mut Criterion) {
         let filename = "data/mdf-kospi200.20110216-0.pcap";
         b.iter(|| {
             let mut kospi_handler = KospiHandler::new(true);
-            let mut output = sink();
 
             let _ = run_pcap_source(black_box(filename), |sec, usec, payload| {
-                kospi_handler.on_packet(sec, usec, payload, &mut output);
+                kospi_handler.on_packet(sec, usec, payload, |_quote| {});
             });
-            kospi_handler.flush_all(&mut output);
+            kospi_handler.flush_all(|_quote| {});
         })
     });
 
     // Micro (Parsing + Heap operations)
     c.bench_function("on_packet", |b| {
         let mut kospi_handler = KospiHandler::new(true);
-        let mut output = sink();
 
         let mut payload = [0u8; 215];
         payload[0..5].copy_from_slice(b"B6034");
@@ -43,7 +40,7 @@ fn kospi_benchmark(c: &mut Criterion) {
                 black_box(ts_sec),
                 black_box(ts_usec),
                 black_box(&payload),
-                &mut output,
+                |_quote| {},
             );
         });
     });
