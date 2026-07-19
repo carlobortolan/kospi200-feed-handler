@@ -32,25 +32,25 @@ The heap is sorted by exchange time (quote accept time), but the sliding window 
 
 #### Macro-Benchmark (end-to-end execution; 10.5 GB PCAP file | 38M Packets | 28.8M Quotes)
 
-- User time (seconds): 8.16 seconds
-- System time (seconds): 0.46 seconds
-- Elapsed (wall clock) time: 8.68 seconds
-- Throughput: **~1.2 GB/s**, **4.4M PPS / ~227 ns per packet** (single-threaded)
+- User time (seconds): 3.92 seconds
+- System time (seconds): 0.79 seconds
+- Elapsed (wall clock) time: 4.75 seconds
+- Throughput: **~2.2 GB/s**, **8M PPS / ~125 ns per packet** (single-threaded)
 - Max application heap: **~256 MB initial pre-allocation** (see [calculation](benches/README.md#the-math-behind-the-256-mb))
 
 #### Micro-Benchmark (isolated execution measured with criterion)
 
-A packet is processed in **~209 ns per packet**; roughly 4.8 million PPS sequentially on a single thread.
+A single packet is processed in **~83 ns per packet**; roughly 12 million PPS sequentially on a single thread.
 
-![on_packet Micro-Benchmark](benches/kospi_on_packet.png)
+![on_packet Micro-Benchmark](benches/kospi_on_packet_nostdout.png)
 
 See [kospi200.pages.dev](https://kospi200.pages.dev/on_packet/report) for full report.
 
 #### CPU Profiling
 
-The flamegraph confirms that once the fixed-size arena and heap are initialized, the parser spends most of its CPU cycles entirely on structural heap sifting (`sift_down_to_bottom`) and raw byte formatting (`copy_nonoverlapping`) and not on memory allocation at runtime.
+The flamegraph confirms that once the fixed-size arena and heap are initialized, the parser spends most of its CPU cycles entirely on structural heap sifting (`sift_down_to_bottom`, `sift_up`) and not on memory allocation at runtime.
 
-![CPU Flamegraph](benches/flamegraph.svg)
+![CPU Flamegraph](benches/flamegraph-nostdout.svg)
 
 _Measured on a selfhosted VM with 32 GB RAM, AMD Ryzen 7 PRO 6850U @ 2.70GHz and Manjaro Linux x86_64_
 
