@@ -43,7 +43,7 @@ fn main() {
         loop_delta_secs
     );
 
-    let output_file = File::create("data/large10g.pcap").expect("Failed to create output PCAP");
+    let output_file = File::create("data/test-large10g.pcap").expect("Failed to create output PCAP");
     let mut writer = BufWriter::with_capacity(1024 * 1024 * 16, output_file); // 16MB write buffer
 
     writer.write_all(global_header).unwrap();
